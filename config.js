@@ -3,6 +3,8 @@
 
    Enquanto FORM_RESPONSE_URL e ENTRY_PAYLOAD estiverem vazios, a página fica em
    MODO TESTE: mostra o resultado na tela e NÃO envia nada.
+   CANAIS: cada canal pode ter  url: 'https://...'  (só https). Com url, o canal vira um link
+   tocável na tela final; sem url, aparece só o texto.
    Dica: com o site publicado, abra o link terminando em  #teste  para ensaiar
    sem enviar (exemplo: https://usuario.github.io/pesquisa-motorista/#teste).
    ============================================================================ */

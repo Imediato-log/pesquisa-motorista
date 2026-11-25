@@ -71,6 +71,8 @@ textarea.area-txt{min-height:104px;resize:vertical;font-weight:400}
 .badge{display:inline-flex;font-size:13px;color:var(--gtext);font-weight:600}
 .chan{background:var(--panel);border-radius:12px;padding:12px 14px;font-size:14.5px}
 .chan b{display:block;font-weight:600}
+a.chan{display:block;text-decoration:none;color:inherit;border:1.5px solid var(--chip);background:#fff;min-height:48px}
+.chan .lk{display:block;margin-top:6px;font-weight:600;color:#2F5FA3;text-decoration:underline}
 .dbg{background:var(--panel);border-radius:12px;padding:10px 12px;font-size:12px}
 .dbg pre{white-space:pre-wrap;word-break:break-word;margin:8px 0 0;font-size:11.5px}
 .nav{display:flex;gap:10px;padding:12px 18px calc(env(safe-area-inset-bottom,0px) + 14px);border-top:1px solid var(--border);background:#fff}
@@ -274,7 +276,11 @@ noscript p{padding:24px;font-size:17px}
         h = '<div class="fim" style="display:flex;flex-direction:column;gap:14px"><span class="badge">✓ Resposta enviada</span><h2 class="tt big" id="tt" tabindex="-1">Obrigado!</h2>' +
             '<p class="hint">' + (A.retorno === 'Sim' ? 'Vamos retornar sobre <b>' + esc(A.assunto) + '</b> pelo telefone informado.' : 'Sua resposta já está com o time de Qualidade.') + '</p>' +
             (nc ? '<p style="font-weight:600">Você disse que não conhece nossos canais. Eles são estes:</p>' : '<p class="hint">Canais oficiais da Imediato:</p>');
-        (C.CANAIS || []).forEach(function (c) { h += '<div class="chan"><b>' + esc(c.nome) + '</b>' + esc(c.texto) + '</div>'; });
+        (C.CANAIS || []).forEach(function (c) {
+          var u = /^https:\/\//i.test(String(c.url || '')) ? c.url : '';
+          h += u ? '<a class="chan" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"><b>' + esc(c.nome) + '</b>' + esc(c.texto) + '<span class="lk">Abrir canal ›</span></a>'
+                 : '<div class="chan"><b>' + esc(c.nome) + '</b>' + esc(c.texto) + '</div>';
+        });
         if (TESTE && ultimoPayload) h += '<details class="dbg" open><summary>Modo teste: nada foi enviado. Veja o que seria enviado.</summary><pre id="json-teste">' + esc(JSON.stringify(ultimoPayload, null, 2)) + '</pre></details>';
         return h + '</div>';
     }
