@@ -12,10 +12,15 @@
    Cuidado: mudar o TEXTO de uma opção muda o que chega na planilha.
    ============================================================================ */
 var QUESTOES = (function () {
-  var VERSAO = 'v2.1-2026-12';
+  var VERSAO = 'v2.2-2027-01';
   var NAO_ESTA = 'Não está na lista';
   var SEM_PROBLEMA = 'Não tenho nenhum problema hoje';
   var PAG_ABERTO = 'Sim, e ainda não foi resolvido';
+  /* Só existe no modo anônimo. */
+  var PREFIRO_NAO = 'Prefiro não informar';
+  var AVISO_TEXTO = 'Não escreva nome, placa ou algo que identifique você.';
+  function anonimo(A) { return A.modo === 'anonimo'; }
+  function maisPrefiro(lista, A) { return anonimo(A) ? lista.concat([PREFIRO_NAO]) : lista; }
 
   var OPERACOES = ['XD - Cross', 'FF - Full', 'Last'];
   var NOME_LIDER = { 'XD - Cross': 'XD', 'FF - Full': 'Full', 'Last': 'Last' };
@@ -148,20 +153,28 @@ var QUESTOES = (function () {
   var TELAS = [
     { id: 'abertura', tipo: 'abertura',
       titulo: 'Olá! Sua opinião ajuda a melhorar o seu dia a dia na operação.',
-      legenda: 'São perguntas rápidas, uma por tela. Suas respostas não mudam a sua avaliação como agregado.' },
+      legenda: 'São perguntas rápidas, uma por tela. Suas respostas não mudam a sua avaliação como agregado.',
+      pergunta_modo: 'Como você quer responder?',
+      ja_respondeu: 'Você já respondeu por este celular. Quer responder de novo?',
+      modos: [
+        { id: 'identificado', nome: 'Responder com identificação', apoio: 'Pedimos a placa. Assim conseguimos dar retorno sobre o seu problema.' },
+        { id: 'anonimo', nome: 'Responder anônimo', apoio: 'Não pedimos placa nem telefone. Não dá para darmos retorno individual.' }
+      ] },
     { id: 'ident', tipo: 'ident',
       titulo: 'Em qual operação você roda?',
       legenda: 'Se roda em mais de uma operação, escolha a que você mais faz.',
+      nota_anonimo: 'Esta pesquisa é anônima: não pedimos placa, nome nem telefone.',
       estado_rotulo: function (A) { return A.operacao === 'Last' ? 'Em qual estado você faz a coleta?' : 'Em qual estado você descarrega?'; },
       estado_vazio: 'Escolha o estado',
       cidade_rotulo: function (A) { return A.operacao === 'Last' ? 'Em qual cidade você faz a coleta?' : 'Em qual cidade você descarrega?'; },
       cidade_vazio: 'Escolha a cidade',
       cidade_digite: 'Escreva a cidade', estado_livre_rotulo: 'Estado dessa cidade' },
     { id: 'placa', tipo: 'placa',
+      se: function (A) { return !anonimo(A); },
       titulo: 'Qual a placa que você mais usa com a gente?',
       legenda: 'Só letras e números, sem traço. Ex.: ABC1D23' },
     { id: 'tempo_casa', tipo: 'unica', campo: 'tempo_casa',
-      titulo: 'Há quanto tempo você roda com a Imediato?', opcoes: LISTAS.tempo_casa },
+      titulo: 'Há quanto tempo você roda com a Imediato?', opcoes: function (A) { return maisPrefiro(LISTAS.tempo_casa, A); } },
     { id: 'exclusivo', tipo: 'unica', campo: 'exclusivo',
       titulo: 'Hoje você roda só com a Imediato?',
       legenda: 'Vale qualquer outra empresa de entrega ou transporte.', opcoes: LISTAS.exclusivo },
@@ -231,6 +244,7 @@ var QUESTOES = (function () {
     { id: 'melhoria', tipo: 'texto', campo: 'melhoria',
       titulo: 'Como a Imediato poderia melhorar sua experiência?', legenda: 'Opcional.', max: 500 },
     { id: 'retorno', tipo: 'retorno',
+      se: function (A) { return !anonimo(A); },
       titulo: 'Quer que a gente retorne para você?',
       assunto_titulo: 'Sobre qual assunto?', assunto_vazio: 'Escolha',
       detalhe_titulo: 'Conte em poucas palavras o que aconteceu', detalhe_min: 10, detalhe_max: 300,
@@ -241,7 +255,7 @@ var QUESTOES = (function () {
   ]);
 
   return {
-    versao: VERSAO, NAO_ESTA: NAO_ESTA, SEM_PROBLEMA: SEM_PROBLEMA, PAG_ABERTO: PAG_ABERTO,
+    versao: VERSAO, PREFIRO_NAO: PREFIRO_NAO, avisoTexto: AVISO_TEXTO, maisPrefiro: maisPrefiro, NAO_ESTA: NAO_ESTA, SEM_PROBLEMA: SEM_PROBLEMA, PAG_ABERTO: PAG_ABERTO,
     cidades: CIDADES, estadosBR: ESTADOS_BR, ufsDa: ufsDa, cidadesDa: cidadesDa, cidadeMin: 2, cidadeMax: 60,
     operacoes: OPERACOES, nomeLider: NOME_LIDER, estados: ESTADOS_BR, notaRotulos: NOTA_ROTULOS,
     areas: AREAS, problemas: PROBLEMAS, espera: ESPERA, listas: LISTAS,

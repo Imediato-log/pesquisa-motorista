@@ -120,7 +120,9 @@ noscript p{padding:24px;font-size:16px}
 (function () {
   'use strict';
   var Q = QUESTOES, C = CONFIG;
-  var KEY = 'pm_v2_estado';
+  var KEY = 'pm_v22_estado', KEY_ENVIADO = 'pm_enviado';
+  /* ordem dos botões de modo: sorteada a cada visita, para o de cima não levar vantagem */
+  var invertido = Math.random() < 0.5;
   var TESTE = !(C.FORM_RESPONSE_URL && C.ENTRY_PAYLOAD) || /(^|[#&])teste(\b|$)/.test(location.hash);
   var TELAS = Q.telas, porId = {};
   TELAS.forEach(function (t) { porId[t.id] = t; });
@@ -154,6 +156,21 @@ noscript p{padding:24px;font-size:16px}
   function len(s) { return String(s || '').trim().length; }
   function cidTxtOk() { var n = len(S.A.cid_txt); return n >= Q.cidadeMin && n <= Q.cidadeMax; }
   function marcou(id) { return S.A.areas.indexOf(id) >= 0; }
+  function anon() { return S.A.modo === 'anonimo'; }
+  function jaRespondeu() { try { return !!localStorage.getItem(KEY_ENVIADO); } catch (e) { return false; } }
+  function aviso() { return anon() ? '<p class="hint">' + esc(Q.avisoTexto) + '</p>' : ''; }
+  /* Trocar de modo apaga o que só vale em um deles. */
+  function definirModo(m) {
+    var A = S.A;
+    if (A.modo && A.modo !== m) {
+      ['placa', 'retorno', 'assunto', 'detalhe', 'telefone', 'consentimento'].forEach(function (c) { delete A[c]; });
+      if (A.estado === Q.PREFIRO_NAO) limparCidade();
+      if (A.cidade === Q.PREFIRO_NAO) delete A.cidade;
+      if (A.tempo_casa === Q.PREFIRO_NAO) delete A.tempo_casa;
+    }
+    A.modo = m;
+  }
+  function ultimaPergunta() { var v = visiveis(), p = v[pos(v, S.cur) + 1]; return !!p && p.tipo === 'fim'; }
   function visiveis() { return TELAS.filter(function (t) { return !t.se || t.se(S.A); }); }
   function pos(lista, id) { for (var i = 0; i < lista.length; i++) if (lista[i].id === id) return i; return -1; }
   function opcoesDe(t) { return val(t.opcoes, S.A) || []; }
@@ -162,9 +179,12 @@ noscript p{padding:24px;font-size:16px}
   function completo(t) {
     var A = S.A;
     switch (t.tipo) {
-      case 'abertura': case 'dias': case 'texto': case 'fim': return true;
+      case 'abertura': return !!A.modo;
+      case 'dias': case 'texto': case 'fim': return true;
       case 'ident':
         if (!A.operacao || !A.estado) return false;
+        if (A.estado === Q.PREFIRO_NAO) return anon();
+        if (A.cidade === Q.PREFIRO_NAO) return anon() && Q.ufsDa(A).indexOf(A.estado) >= 0;
         if (A.estado === Q.NAO_ESTA) return !!A.estado_livre && cidTxtOk();
         if (A.cidade === Q.NAO_ESTA) return cidTxtOk();
         return Q.cidadesDa(A).indexOf(A.cidade) >= 0;
@@ -211,19 +231,24 @@ noscript p{padding:24px;font-size:16px}
     var A = S.A, h = '', i;
     switch (t.tipo) {
       case 'abertura':
-        return cab(t) + '<p class="hint">Leva poucos minutos.</p>';
+        h = cab(t) + '<p class="hint">Leva poucos minutos.</p>' + (jaRespondeu() ? '<div class="aviso" role="status">' + esc(t.ja_respondeu) + '</div>' : '') +
+            '<p class="rot">' + esc(t.pergunta_modo) + '</p><div class="opts">';
+        (invertido ? t.modos.slice().reverse() : t.modos).forEach(function (m) {
+          h += '<button type="button" class="opt" data-key="md' + m.id + '" data-a="modo" data-id="' + m.id + '">' + esc(m.nome) + '<small>' + esc(m.apoio) + '</small></button>';
+        });
+        return h + '</div>';
       case 'ident':
-        h = cab(t) + '<div class="opts">';
+        h = cab(t) + (anon() ? '<div class="aviso">' + esc(t.nota_anonimo) + '</div>' : '') + '<div class="opts">';
         Q.operacoes.forEach(function (o, k) { h += btn('op' + k, 'data-a="op" data-i="' + k + '"', A.operacao === o, esc(o)); });
         h += '</div>';
         if (A.operacao) {
-          h += selHtml('f-estado', 'estado', val(t.estado_rotulo, A), t.estado_vazio, Q.ufsDa(A).concat([Q.NAO_ESTA]), A.estado);
+          h += selHtml('f-estado', 'estado', val(t.estado_rotulo, A), t.estado_vazio, Q.maisPrefiro(Q.ufsDa(A).concat([Q.NAO_ESTA]), A), A.estado);
           if (A.estado === Q.NAO_ESTA) {
             h += '<label class="rot" for="f-cid-txt">' + esc(t.cidade_digite) + '</label><input class="txt" id="f-cid-txt" data-f="cid_txt" maxlength="' + Q.cidadeMax + '" autocomplete="off" value="' + esc(A.cid_txt || '') + '">';
-            h += selHtml('f-estado-livre', 'estado_livre', t.estado_livre_rotulo, t.estado_vazio, Q.estadosBR, A.estado_livre);
-          } else if (A.estado) {
-            h += selHtml('f-cidade', 'cidade', val(t.cidade_rotulo, A), t.cidade_vazio, Q.cidadesDa(A).concat([Q.NAO_ESTA]), A.cidade);
-            if (A.cidade === Q.NAO_ESTA) h += '<label class="rot" for="f-cid-txt">' + esc(t.cidade_digite) + '</label><input class="txt" id="f-cid-txt" data-f="cid_txt" maxlength="' + Q.cidadeMax + '" autocomplete="off" value="' + esc(A.cid_txt || '') + '">';
+            h += aviso() + selHtml('f-estado-livre', 'estado_livre', t.estado_livre_rotulo, t.estado_vazio, Q.estadosBR, A.estado_livre);
+          } else if (A.estado && A.estado !== Q.PREFIRO_NAO) {
+            h += selHtml('f-cidade', 'cidade', val(t.cidade_rotulo, A), t.cidade_vazio, Q.maisPrefiro(Q.cidadesDa(A).concat([Q.NAO_ESTA]), A), A.cidade);
+            if (A.cidade === Q.NAO_ESTA) h += '<label class="rot" for="f-cid-txt">' + esc(t.cidade_digite) + '</label><input class="txt" id="f-cid-txt" data-f="cid_txt" maxlength="' + Q.cidadeMax + '" autocomplete="off" value="' + esc(A.cid_txt || '') + '">' + aviso();
           }
         }
         return h;
@@ -235,7 +260,7 @@ noscript p{padding:24px;font-size:16px}
         h = cab(t) + '<div class="opts">';
         opcoesDe(t).forEach(function (o, k) { h += btn(t.id + k, 'data-a="unica" data-i="' + k + '"', A[t.campo] === o, esc(o)); });
         h += '</div>';
-        if (t.texto_se_nao_esta && A[t.campo] === Q.NAO_ESTA) h += qualInput('f-qual', A[t.texto_se_nao_esta], 'Qual?');
+        if (t.texto_se_nao_esta && A[t.campo] === Q.NAO_ESTA) h += qualInput('f-qual', A[t.texto_se_nao_esta], 'Qual?') + aviso();
         return h;
       case 'nps':
         h = cab(t) + '<div class="nps">';
@@ -265,7 +290,7 @@ noscript p{padding:24px;font-size:16px}
           h += btn(t.id + k, 'data-a="prob" data-i="' + k + '"', on, '<span class="chk-mark" aria-hidden="true">' + (on ? '✓' : '') + '</span>' + esc(o));
         });
         h += '</div>';
-        if (sel.indexOf(Q.NAO_ESTA) >= 0) h += qualInput('f-qual', A.texto[t.area], 'Qual?');
+        if (sel.indexOf(Q.NAO_ESTA) >= 0) h += qualInput('f-qual', A.texto[t.area], 'Qual?') + aviso();
         return h;
       case 'area_principal':
         h = cab(t) + '<div class="opts">';
@@ -282,7 +307,7 @@ noscript p{padding:24px;font-size:16px}
         return cab(t) + step(t.rotulo_roda, 'dias_roda') + step(t.rotulo_gostaria, 'dias_gostaria') +
                '<p class="hint">' + (A.dias_gostaria > A.dias_roda ? 'Você gostaria de rodar mais ' + (A.dias_gostaria - A.dias_roda) + ' dia(s) por semana.' : 'Toque no + e no − para ajustar.') + '</p>';
       case 'texto':
-        return cab(t) + '<textarea class="area-txt" id="f-melhoria" data-f="melhoria" maxlength="' + t.max + '" aria-label="' + esc(t.titulo) + '" placeholder="Escreva aqui">' + esc(A.melhoria || '') + '</textarea><p class="hint" id="c-melhoria">' + len(A.melhoria) + '/' + t.max + '</p>';
+        return cab(t) + '<textarea class="area-txt" id="f-melhoria" data-f="melhoria" maxlength="' + t.max + '" aria-label="' + esc(t.titulo) + '" placeholder="Escreva aqui">' + esc(A.melhoria || '') + '</textarea><p class="hint" id="c-melhoria">' + len(A.melhoria) + '/' + t.max + '</p>' + aviso();
       case 'retorno':
         h = cab(t) + '<div class="opts">' + btn('rs', 'data-a="ret" data-v="Sim"', A.retorno === 'Sim', 'Sim, quero retorno') + btn('rn', 'data-a="ret" data-v="Não"', A.retorno === 'Não', 'Não precisa') + '</div>';
         if (A.retorno === 'Sim') {
@@ -295,12 +320,11 @@ noscript p{padding:24px;font-size:16px}
                  '<label class="consent"><input type="checkbox" id="f-cons" data-f="consentimento"' + (A.consentimento === true ? ' checked' : '') + '><span>' + esc(t.consentimento) + '</span></label>';
           }
         }
-        if (erroEnvio) h += '<div class="erro" role="alert">' + esc(erroEnvio) + '</div>';
         return h;
       case 'fim':
         var nc = A.canais === 'Não conheço';
         h = '<div class="fim" style="display:flex;flex-direction:column;gap:14px"><span class="badge">✓ Resposta enviada</span><h2 class="tt big" id="tt" tabindex="-1">Obrigado!</h2>' +
-            '<p class="hint">' + (A.retorno === 'Sim' ? 'Vamos retornar sobre <b>' + esc(A.assunto) + '</b> pelo telefone informado.' : 'Sua resposta já está com o time de Qualidade.') + '</p>' +
+            '<p class="hint">' + (A.retorno === 'Sim' ? 'Vamos retornar sobre <b>' + esc(A.assunto) + '</b> pelo telefone informado.' : anon() ? 'Sua resposta anônima já está com o time de Qualidade. Se precisar de retorno sobre um problema, use um dos canais abaixo.' : 'Sua resposta já está com o time de Qualidade.') + '</p>' +
             (nc ? '<p style="font-weight:600">Você disse que não conhece nossos canais. Eles são estes:</p>' : '<p class="hint">Canais oficiais da Imediato:</p>');
         (C.CANAIS || []).forEach(function (c) {
           var u = /^https:\/\//i.test(String(c.url || '')) ? c.url : '';
@@ -321,7 +345,7 @@ noscript p{padding:24px;font-size:16px}
   /* ---------- tela, barra e botões ---------- */
   function render(manter) {
     var t = porId[S.cur], antes = corpo.scrollTop, foco = document.activeElement && document.activeElement.getAttribute ? document.activeElement.getAttribute('data-key') : null;
-    corpo.innerHTML = html(t);
+    corpo.innerHTML = html(t) + (erroEnvio ? '<div class="erro" role="alert">' + esc(erroEnvio) + '</div>' : '');
     if (manter) {
       corpo.scrollTop = antes;
       if (foco) { var f = corpo.querySelector('[data-key="' + foco + '"]'); if (f) try { f.focus({ preventScroll: true }); } catch (e) {} }
@@ -337,12 +361,12 @@ noscript p{padding:24px;font-size:16px}
     if (t.tipo === 'fim') { barra.style.width = '100%'; cnt.textContent = 'Concluída'; }
     else if (t.tipo === 'abertura') { barra.style.width = '0'; cnt.textContent = ''; }
     else { barra.style.width = Math.round(i / (v.length - 1) * 100) + '%'; cnt.textContent = i + ' de ' + (v.length - 1); }
-    var ultimo = t.tipo === 'retorno';
-    btnAvancar.textContent = enviando ? 'Enviando...' : t.tipo === 'abertura' ? 'Começar' : ultimo ? (erroEnvio ? 'Tentar de novo' : 'Enviar') : 'Continuar';
+    var ultimo = ultimaPergunta();
+    btnAvancar.textContent = enviando ? 'Enviando...' : ultimo ? (erroEnvio ? 'Tentar de novo' : 'Enviar') : 'Continuar';
     btnAvancar.disabled = enviando || !completo(t);
     btnVoltar.style.display = (t.tipo === 'abertura' || t.tipo === 'fim') ? 'none' : '';
     btnVoltar.disabled = enviando || !S.hist.length;
-    btnAvancar.style.display = t.tipo === 'fim' ? 'none' : '';
+    btnAvancar.style.display = (t.tipo === 'fim' || t.tipo === 'abertura') ? 'none' : '';
   }
   function atualizarNav() { barraENav(porId[S.cur]); salvar(); }
 
@@ -351,7 +375,7 @@ noscript p{padding:24px;font-size:16px}
     var t = porId[S.cur];
     if (!completo(t) || enviando) return;
     if (t.tipo === 'abertura' && !S.inicio) S.inicio = Date.now();
-    if (t.tipo === 'retorno') { enviar(); return; }
+    if (ultimaPergunta()) { enviar(); return; }
     var v = visiveis(), prox = v[pos(v, S.cur) + 1];
     if (!prox) return;
     S.hist.push(S.cur); S.cur = prox.id; render();
@@ -364,10 +388,10 @@ noscript p{padding:24px;font-size:16px}
     var A = S.A, areas = Q.areas.map(function (a) { return a.id; }).filter(marcou);
     if (A.sem_problema === true) areas = [];
     var p = {
-      id_resposta: S.id, versao: Q.versao, hp: hp.value || '',
+      id_resposta: S.id, versao: Q.versao, modo: A.modo, ja_respondeu: jaRespondeu(), hp: hp.value || '',
       duracao_seg: S.inicio ? Math.max(0, Math.round((Date.now() - S.inicio) / 1000)) : 0,
       operacao: A.operacao, estado: A.estado === Q.NAO_ESTA ? A.estado_livre : A.estado, placa: A.placa,
-      cidade: (A.estado === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA) ? String(A.cid_txt || '').trim() : A.cidade,
+      cidade: A.estado === Q.PREFIRO_NAO ? '' : (A.estado === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA) ? String(A.cid_txt || '').trim() : A.cidade,
       cidade_fora_lista: A.estado === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA,
       tempo_casa: A.tempo_casa, exclusivo: A.exclusivo, nps: A.nps, notas: {},
       frete_vs_mercado: A.frete, sem_problema: A.sem_problema === true,
@@ -386,6 +410,7 @@ noscript p{padding:24px;font-size:16px}
       if (sel.indexOf(Q.NAO_ESTA) >= 0) p.problemas_texto[id] = String(A.texto[id] || '').trim();
     });
     if (A.pagamento === Q.PAG_ABERTO) { p.pag_tempo_aberto = A.pag_tempo; p.pag_protocolo = A.pag_protocolo; }
+    if (anon()) { delete p.placa; delete p.quer_retorno; }
     if (p.quer_retorno) p.contato = { assunto: A.assunto, detalhe: String(A.detalhe || '').trim(), telefone: digitos(A.telefone), consentimento: A.consentimento === true };
     return p;
   }
@@ -403,6 +428,7 @@ noscript p{padding:24px;font-size:16px}
     var tarefa = TESTE ? new Promise(function (res) { res(window.__envioTeste ? window.__envioTeste(p) : undefined); }) : postar(p);
     tarefa.then(function () {
       enviando = false; ultimoPayload = p; if (TESTE) window.__ultimoPayload = p;
+      try { localStorage.setItem(KEY_ENVIADO, '1'); } catch (e) {}
       limpar(); S.cur = 'fim'; S.hist = []; render();
     }, function () {
       enviando = false;
@@ -417,7 +443,9 @@ noscript p{padding:24px;font-size:16px}
   corpo.addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('[data-a]') : null; if (!b || enviando) return;
     var A = S.A, t = porId[S.cur], a = b.getAttribute('data-a'), i = +b.getAttribute('data-i'), id = b.getAttribute('data-id');
-    if (a === 'op') {
+    if (a === 'modo') {
+      definirModo(id); erroEnvio = ''; avancar();
+    } else if (a === 'op') {
       if (A.operacao !== Q.operacoes[i]) limparCidade();
       A.operacao = Q.operacoes[i]; delete A.espera; delete A.problemas.operacional; delete A.texto.operacional; render(true);
     } else if (a === 'unica') {
@@ -484,6 +512,10 @@ noscript p{padding:24px;font-size:16px}
 
   /* ---------- início ---------- */
   S = carregar() || novoEstado();
+  var forcado = location.hash.match(/(?:^#|&)modo=(anonimo|identificado)(?:&|$)/);
+  if (forcado && (S.cur === 'abertura' || S.A.modo !== forcado[1])) {
+    definirModo(forcado[1]); S.cur = 'ident'; S.hist = ['abertura']; if (!S.inicio) S.inicio = Date.now();
+  }
   if (TESTE) { document.getElementById('aviso').hidden = false; }
   render();
 })();
