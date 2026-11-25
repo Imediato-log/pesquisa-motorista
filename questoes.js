@@ -12,16 +12,50 @@
    Cuidado: mudar o TEXTO de uma opção muda o que chega na planilha.
    ============================================================================ */
 var QUESTOES = (function () {
-  var VERSAO = 'v2-2026-12';
+  var VERSAO = 'v2.1-2026-12';
   var NAO_ESTA = 'Não está na lista';
   var SEM_PROBLEMA = 'Não tenho nenhum problema hoje';
   var PAG_ABERTO = 'Sim, e ainda não foi resolvido';
 
   var OPERACOES = ['XD - Cross', 'FF - Full', 'Last'];
   var NOME_LIDER = { 'XD - Cross': 'XD', 'FF - Full': 'Full', 'Last': 'Last' };
-  var ESTADOS = ['Ceará', 'Distrito Federal', 'Goiás', 'Mato Grosso do Sul', 'Minas Gerais', 'Paraná',
+  var ESTADOS = ['Ceará', 'Distrito Federal', 'Espírito Santo', 'Goiás', 'Mato Grosso do Sul', 'Minas Gerais', 'Paraná',
                  'Rio Grande do Sul', 'Rio de Janeiro', 'Santa Catarina', 'São Paulo'];
   var NOTA_ROTULOS = ['Muito ruim', 'Ruim', 'Regular', 'Bom', 'Ótimo'];
+
+  /* Todos os estados, só para quem digita uma cidade que "Não está na lista". */
+  var ESTADOS_BR = ['Acre', 'Alagoas', 'Amapá', 'Amazonas', 'Bahia', 'Ceará', 'Distrito Federal', 'Espírito Santo', 'Goiás',
+                    'Maranhão', 'Mato Grosso', 'Mato Grosso do Sul', 'Minas Gerais', 'Pará', 'Paraíba', 'Paraná', 'Pernambuco',
+                    'Piauí', 'Rio de Janeiro', 'Rio Grande do Norte', 'Rio Grande do Sul', 'Rondônia', 'Roraima',
+                    'Santa Catarina', 'São Paulo', 'Sergipe', 'Tocantins'];
+
+  /* Cidades por operação e estado. Sem o código do HUB (de propósito): o HUB se cruza depois pela placa.
+     Onde dois HUBs ficam na mesma cidade (ex.: Extrema, São Carlos) aparece uma cidade só. */
+  var CIDADES = {
+    'XD - Cross': {
+      'Goiás': ['Goiânia'],
+      'Mato Grosso do Sul': ['Campo Grande'],
+      'Minas Gerais': ['Contagem', 'Pouso Alegre', 'Uberlândia'],
+      'Paraná': ['Araucária', 'Londrina', 'Maringá'],
+      'São Paulo': ['Bauru', 'Campinas', 'Cravinhos', 'Guarulhos', 'Marília', 'Presidente Prudente']
+    },
+    'FF - Full': {
+      'Espírito Santo': ['Serra'],
+      'Minas Gerais': ['Betim', 'Extrema', 'Ipatinga', 'Juiz de Fora', 'Pouso Alegre', 'Uberlândia'],
+      'Rio de Janeiro': ['Queimados'],
+      'São Paulo': ['Araçariguama', 'Embu das Artes', 'Franco da Rocha', 'Guarulhos', 'Itupeva', 'Perus',
+                    'Presidente Prudente', 'São Carlos', 'Sumaré']
+    },
+    'Last': {
+      'Distrito Federal': ['Brasília'],
+      'Minas Gerais': ['Contagem'],
+      'Paraná': ['Campina Grande do Sul', 'Cascavel', 'Curitiba'],
+      'Santa Catarina': ['Itajaí', 'Joinville'],
+      'São Paulo': ['Bauru', 'Cravinhos', 'Franca', 'Ribeirão Preto', 'São Carlos']
+    }
+  };
+  function ufsDa(A) { return Object.keys(CIDADES[A.operacao] || {}); }
+  function cidadesDa(A) { return ((CIDADES[A.operacao] || {})[A.cid_uf]) || []; }
 
   var AREAS = [
     { id: 'escala', nome: 'Escala', apoio: 'quem monta suas rotas: horários, paradas, KM e quantidade de rotas' },
@@ -121,6 +155,14 @@ var QUESTOES = (function () {
       titulo: 'Em qual operação e estado você roda?',
       legenda: 'Se roda em mais de uma operação, escolha a que você mais faz.',
       estado_rotulo: 'Em qual estado você roda?' },
+    { id: 'cid_uf', tipo: 'unica', campo: 'cid_uf',
+      titulo: function (A) { return A.operacao === 'Last' ? 'Em qual estado você faz a coleta?' : 'Em qual estado você descarrega?'; },
+      legenda: 'Só aparecem os estados da sua operação. Se o seu não estiver na lista, escolha a última opção.',
+      opcoes: function (A) { return ufsDa(A).concat([NAO_ESTA]); } },
+    { id: 'cidade', tipo: 'cidade',
+      titulo: function (A) { return A.operacao === 'Last' ? 'Em qual cidade você faz a coleta?' : 'Em qual cidade você descarrega?'; },
+      legenda: function (A) { return A.cid_uf === NAO_ESTA ? 'Escreva a cidade e escolha o estado.' : 'Estado: ' + A.cid_uf + '.'; },
+      cidade_rotulo: 'Cidade', estado_rotulo: 'Estado', estado_vazio: 'Escolha o estado' },
     { id: 'placa', tipo: 'placa',
       titulo: 'Qual a placa que você mais usa com a gente?',
       legenda: 'Só letras e números, sem traço. Ex.: ABC1D23' },
@@ -206,6 +248,7 @@ var QUESTOES = (function () {
 
   return {
     versao: VERSAO, NAO_ESTA: NAO_ESTA, SEM_PROBLEMA: SEM_PROBLEMA, PAG_ABERTO: PAG_ABERTO,
+    cidades: CIDADES, estadosBR: ESTADOS_BR, ufsDa: ufsDa, cidadesDa: cidadesDa, cidadeMin: 2, cidadeMax: 60,
     operacoes: OPERACOES, nomeLider: NOME_LIDER, estados: ESTADOS, notaRotulos: NOTA_ROTULOS,
     areas: AREAS, problemas: PROBLEMAS, espera: ESPERA, listas: LISTAS,
     intencaoRisco: INTENCAO_RISCO, intencaoFirme: INTENCAO_FIRME,

@@ -152,6 +152,7 @@ noscript p{padding:24px;font-size:16px}
   function limpar() { try { localStorage.removeItem(KEY); } catch (e) {} }
   function digitos(s) { return String(s || '').replace(/\D/g, ''); }
   function len(s) { return String(s || '').trim().length; }
+  function cidTxtOk() { var n = len(S.A.cid_txt); return n >= Q.cidadeMin && n <= Q.cidadeMax; }
   function marcou(id) { return S.A.areas.indexOf(id) >= 0; }
   function visiveis() { return TELAS.filter(function (t) { return !t.se || t.se(S.A); }); }
   function pos(lista, id) { for (var i = 0; i < lista.length; i++) if (lista[i].id === id) return i; return -1; }
@@ -163,6 +164,10 @@ noscript p{padding:24px;font-size:16px}
     switch (t.tipo) {
       case 'abertura': case 'dias': case 'texto': case 'fim': return true;
       case 'ident': return !!(A.operacao && A.estado);
+      case 'cidade':
+        if (A.cid_uf === Q.NAO_ESTA) return cidTxtOk() && !!A.cid_uf_livre;
+        if (A.cidade === Q.NAO_ESTA) return cidTxtOk();
+        return Q.cidadesDa(A).indexOf(A.cidade) >= 0;
       case 'placa': return new RegExp(Q.placaRegex).test(A.placa || '');
       case 'unica':
         if (!A[t.campo]) return false;
@@ -209,6 +214,22 @@ noscript p{padding:24px;font-size:16px}
         if (A.operacao) {
           h += '<label class="rot" for="f-estado">' + esc(t.estado_rotulo) + '</label><select class="sel" id="f-estado" data-f="estado"><option value="">Escolha o estado</option>';
           Q.estados.forEach(function (e) { h += '<option' + (A.estado === e ? ' selected' : '') + '>' + esc(e) + '</option>'; });
+          h += '</select>';
+        }
+        return h;
+      case 'cidade':
+        h = cab(t);
+        if (A.cid_uf !== Q.NAO_ESTA) {
+          h += '<div class="opts">';
+          Q.cidadesDa(A).concat([Q.NAO_ESTA]).forEach(function (o, k) { h += btn('cd' + k, 'data-a="cid" data-i="' + k + '"', A.cidade === o, esc(o)); });
+          h += '</div>';
+        }
+        if (A.cid_uf === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA) {
+          h += '<label class="rot" for="f-cid-txt">' + esc(t.cidade_rotulo) + '</label><input class="txt" id="f-cid-txt" data-f="cid_txt" maxlength="' + Q.cidadeMax + '" autocomplete="off" value="' + esc(A.cid_txt || '') + '">';
+        }
+        if (A.cid_uf === Q.NAO_ESTA) {
+          h += '<label class="rot" for="f-cid-uf">' + esc(t.estado_rotulo) + '</label><select class="sel" id="f-cid-uf" data-f="cid_uf_livre"><option value="">' + esc(t.estado_vazio) + '</option>';
+          Q.estadosBR.forEach(function (e) { h += '<option' + (A.cid_uf_livre === e ? ' selected' : '') + '>' + esc(e) + '</option>'; });
           h += '</select>';
         }
         return h;
@@ -352,6 +373,9 @@ noscript p{padding:24px;font-size:16px}
       id_resposta: S.id, versao: Q.versao, hp: hp.value || '',
       duracao_seg: S.inicio ? Math.max(0, Math.round((Date.now() - S.inicio) / 1000)) : 0,
       operacao: A.operacao, estado: A.estado, placa: A.placa,
+      cidade_estado: A.cid_uf === Q.NAO_ESTA ? A.cid_uf_livre : A.cid_uf,
+      cidade: (A.cid_uf === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA) ? String(A.cid_txt || '').trim() : A.cidade,
+      cidade_fora_lista: A.cid_uf === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA,
       tempo_casa: A.tempo_casa, exclusivo: A.exclusivo, nps: A.nps, notas: {},
       frete_vs_mercado: A.frete, sem_problema: A.sem_problema === true,
       areas: areas, area_principal: areas.length === 1 ? areas[0] : (areas.length > 1 ? A.area_principal : ''),
@@ -395,17 +419,23 @@ noscript p{padding:24px;font-size:16px}
   }
 
   /* ---------- toques e digitação ---------- */
+  function limparCidade() { var A = S.A; delete A.cid_uf; delete A.cidade; delete A.cid_txt; delete A.cid_uf_livre; }
   function limparAreaDesmarcada(id) { delete S.A.problemas[id]; delete S.A.texto[id]; if (S.A.area_principal === id) delete S.A.area_principal; }
   corpo.addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('[data-a]') : null; if (!b || enviando) return;
     var A = S.A, t = porId[S.cur], a = b.getAttribute('data-a'), i = +b.getAttribute('data-i'), id = b.getAttribute('data-id');
     if (a === 'op') {
+      if (A.operacao !== Q.operacoes[i]) limparCidade();
       A.operacao = Q.operacoes[i]; delete A.espera; delete A.problemas.operacional; delete A.texto.operacional; render(true);
     } else if (a === 'unica') {
+      if (t.campo === 'cid_uf' && A.cid_uf !== opcoesDe(t)[i]) limparCidade();
       A[t.campo] = opcoesDe(t)[i];
       if (t.campo === 'pagamento' && A.pagamento !== Q.PAG_ABERTO) { delete A.pag_tempo; delete A.pag_protocolo; }
       if (t.texto_se_nao_esta && A[t.campo] !== Q.NAO_ESTA) delete A[t.texto_se_nao_esta];
       render(true); if (!(t.texto_se_nao_esta && A[t.campo] === Q.NAO_ESTA)) autoAvancar(t.id);
+    } else if (a === 'cid') {
+      A.cidade = Q.cidadesDa(A).concat([Q.NAO_ESTA])[i];
+      if (A.cidade !== Q.NAO_ESTA) { delete A.cid_txt; render(true); autoAvancar(t.id); } else render(true);
     } else if (a === 'nps') {
       A.nps = +b.getAttribute('data-v'); render(true); autoAvancar(t.id);
     } else if (a === 'nota') {
@@ -438,6 +468,8 @@ noscript p{padding:24px;font-size:16px}
       e.target.classList.toggle('ok', ok); document.getElementById('placa-hint').textContent = ok ? 'Placa válida.' : 'São 3 letras, 1 número, 1 letra ou número e mais 2 números.';
     } else if (id === 'f-qual') {
       if (t.tipo === 'multi_prob') A.texto[t.area] = e.target.value; else A[t.texto_se_nao_esta] = e.target.value;
+    } else if (f === 'cid_txt') {
+      A.cid_txt = e.target.value;
     } else if (f === 'melhoria') {
       A.melhoria = e.target.value; document.getElementById('c-melhoria').textContent = len(A.melhoria) + '/' + t.max;
     } else if (f === 'detalhe') {
@@ -450,6 +482,7 @@ noscript p{padding:24px;font-size:16px}
   corpo.addEventListener('change', function (e) {
     var f = e.target.getAttribute('data-f'), A = S.A;
     if (f === 'estado') A.estado = e.target.value || undefined;
+    else if (f === 'cid_uf_livre') A.cid_uf_livre = e.target.value || undefined;
     else if (f === 'assunto') { A.assunto = e.target.value || undefined; render(true); return; }
     else if (f === 'consentimento') A.consentimento = e.target.checked;
     else return;
