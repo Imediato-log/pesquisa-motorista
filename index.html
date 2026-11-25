@@ -163,9 +163,9 @@ noscript p{padding:24px;font-size:16px}
     var A = S.A;
     switch (t.tipo) {
       case 'abertura': case 'dias': case 'texto': case 'fim': return true;
-      case 'ident': return !!(A.operacao && A.estado);
-      case 'cidade':
-        if (A.cid_uf === Q.NAO_ESTA) return cidTxtOk() && !!A.cid_uf_livre;
+      case 'ident':
+        if (!A.operacao || !A.estado) return false;
+        if (A.estado === Q.NAO_ESTA) return !!A.estado_livre && cidTxtOk();
         if (A.cidade === Q.NAO_ESTA) return cidTxtOk();
         return Q.cidadesDa(A).indexOf(A.cidade) >= 0;
       case 'placa': return new RegExp(Q.placaRegex).test(A.placa || '');
@@ -202,6 +202,11 @@ noscript p{padding:24px;font-size:16px}
   function qualInput(id, valor, rot) {
     return '<label class="rot" for="' + id + '">' + rot + '</label><input class="txt" id="' + id + '" maxlength="' + Q.textoMax + '" autocomplete="off" value="' + esc(valor || '') + '">';
   }
+  function selHtml(id, f, rot, vazio, lista, atual) {
+    var h = '<label class="rot" for="' + id + '">' + esc(rot) + '</label><select class="sel" id="' + id + '" data-f="' + f + '"><option value="">' + esc(vazio) + '</option>';
+    lista.forEach(function (e) { h += '<option' + (atual === e ? ' selected' : '') + '>' + esc(e) + '</option>'; });
+    return h + '</select>';
+  }
   function html(t) {
     var A = S.A, h = '', i;
     switch (t.tipo) {
@@ -212,25 +217,14 @@ noscript p{padding:24px;font-size:16px}
         Q.operacoes.forEach(function (o, k) { h += btn('op' + k, 'data-a="op" data-i="' + k + '"', A.operacao === o, esc(o)); });
         h += '</div>';
         if (A.operacao) {
-          h += '<label class="rot" for="f-estado">' + esc(t.estado_rotulo) + '</label><select class="sel" id="f-estado" data-f="estado"><option value="">Escolha o estado</option>';
-          Q.estados.forEach(function (e) { h += '<option' + (A.estado === e ? ' selected' : '') + '>' + esc(e) + '</option>'; });
-          h += '</select>';
-        }
-        return h;
-      case 'cidade':
-        h = cab(t);
-        if (A.cid_uf !== Q.NAO_ESTA) {
-          h += '<div class="opts">';
-          Q.cidadesDa(A).concat([Q.NAO_ESTA]).forEach(function (o, k) { h += btn('cd' + k, 'data-a="cid" data-i="' + k + '"', A.cidade === o, esc(o)); });
-          h += '</div>';
-        }
-        if (A.cid_uf === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA) {
-          h += '<label class="rot" for="f-cid-txt">' + esc(t.cidade_rotulo) + '</label><input class="txt" id="f-cid-txt" data-f="cid_txt" maxlength="' + Q.cidadeMax + '" autocomplete="off" value="' + esc(A.cid_txt || '') + '">';
-        }
-        if (A.cid_uf === Q.NAO_ESTA) {
-          h += '<label class="rot" for="f-cid-uf">' + esc(t.estado_rotulo) + '</label><select class="sel" id="f-cid-uf" data-f="cid_uf_livre"><option value="">' + esc(t.estado_vazio) + '</option>';
-          Q.estadosBR.forEach(function (e) { h += '<option' + (A.cid_uf_livre === e ? ' selected' : '') + '>' + esc(e) + '</option>'; });
-          h += '</select>';
+          h += selHtml('f-estado', 'estado', val(t.estado_rotulo, A), t.estado_vazio, Q.ufsDa(A).concat([Q.NAO_ESTA]), A.estado);
+          if (A.estado === Q.NAO_ESTA) {
+            h += '<label class="rot" for="f-cid-txt">' + esc(t.cidade_digite) + '</label><input class="txt" id="f-cid-txt" data-f="cid_txt" maxlength="' + Q.cidadeMax + '" autocomplete="off" value="' + esc(A.cid_txt || '') + '">';
+            h += selHtml('f-estado-livre', 'estado_livre', t.estado_livre_rotulo, t.estado_vazio, Q.estadosBR, A.estado_livre);
+          } else if (A.estado) {
+            h += selHtml('f-cidade', 'cidade', val(t.cidade_rotulo, A), t.cidade_vazio, Q.cidadesDa(A).concat([Q.NAO_ESTA]), A.cidade);
+            if (A.cidade === Q.NAO_ESTA) h += '<label class="rot" for="f-cid-txt">' + esc(t.cidade_digite) + '</label><input class="txt" id="f-cid-txt" data-f="cid_txt" maxlength="' + Q.cidadeMax + '" autocomplete="off" value="' + esc(A.cid_txt || '') + '">';
+          }
         }
         return h;
       case 'placa':
@@ -372,10 +366,9 @@ noscript p{padding:24px;font-size:16px}
     var p = {
       id_resposta: S.id, versao: Q.versao, hp: hp.value || '',
       duracao_seg: S.inicio ? Math.max(0, Math.round((Date.now() - S.inicio) / 1000)) : 0,
-      operacao: A.operacao, estado: A.estado, placa: A.placa,
-      cidade_estado: A.cid_uf === Q.NAO_ESTA ? A.cid_uf_livre : A.cid_uf,
-      cidade: (A.cid_uf === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA) ? String(A.cid_txt || '').trim() : A.cidade,
-      cidade_fora_lista: A.cid_uf === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA,
+      operacao: A.operacao, estado: A.estado === Q.NAO_ESTA ? A.estado_livre : A.estado, placa: A.placa,
+      cidade: (A.estado === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA) ? String(A.cid_txt || '').trim() : A.cidade,
+      cidade_fora_lista: A.estado === Q.NAO_ESTA || A.cidade === Q.NAO_ESTA,
       tempo_casa: A.tempo_casa, exclusivo: A.exclusivo, nps: A.nps, notas: {},
       frete_vs_mercado: A.frete, sem_problema: A.sem_problema === true,
       areas: areas, area_principal: areas.length === 1 ? areas[0] : (areas.length > 1 ? A.area_principal : ''),
@@ -419,7 +412,7 @@ noscript p{padding:24px;font-size:16px}
   }
 
   /* ---------- toques e digitação ---------- */
-  function limparCidade() { var A = S.A; delete A.cid_uf; delete A.cidade; delete A.cid_txt; delete A.cid_uf_livre; }
+  function limparCidade() { var A = S.A; delete A.estado; delete A.estado_livre; delete A.cidade; delete A.cid_txt; }
   function limparAreaDesmarcada(id) { delete S.A.problemas[id]; delete S.A.texto[id]; if (S.A.area_principal === id) delete S.A.area_principal; }
   corpo.addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('[data-a]') : null; if (!b || enviando) return;
@@ -428,14 +421,10 @@ noscript p{padding:24px;font-size:16px}
       if (A.operacao !== Q.operacoes[i]) limparCidade();
       A.operacao = Q.operacoes[i]; delete A.espera; delete A.problemas.operacional; delete A.texto.operacional; render(true);
     } else if (a === 'unica') {
-      if (t.campo === 'cid_uf' && A.cid_uf !== opcoesDe(t)[i]) limparCidade();
       A[t.campo] = opcoesDe(t)[i];
       if (t.campo === 'pagamento' && A.pagamento !== Q.PAG_ABERTO) { delete A.pag_tempo; delete A.pag_protocolo; }
       if (t.texto_se_nao_esta && A[t.campo] !== Q.NAO_ESTA) delete A[t.texto_se_nao_esta];
       render(true); if (!(t.texto_se_nao_esta && A[t.campo] === Q.NAO_ESTA)) autoAvancar(t.id);
-    } else if (a === 'cid') {
-      A.cidade = Q.cidadesDa(A).concat([Q.NAO_ESTA])[i];
-      if (A.cidade !== Q.NAO_ESTA) { delete A.cid_txt; render(true); autoAvancar(t.id); } else render(true);
     } else if (a === 'nps') {
       A.nps = +b.getAttribute('data-v'); render(true); autoAvancar(t.id);
     } else if (a === 'nota') {
@@ -481,8 +470,10 @@ noscript p{padding:24px;font-size:16px}
   });
   corpo.addEventListener('change', function (e) {
     var f = e.target.getAttribute('data-f'), A = S.A;
-    if (f === 'estado') A.estado = e.target.value || undefined;
-    else if (f === 'cid_uf_livre') A.cid_uf_livre = e.target.value || undefined;
+    if (f === 'estado') {
+      A.estado = e.target.value || undefined; delete A.cidade; delete A.cid_txt; delete A.estado_livre; render(true); return;
+    } else if (f === 'cidade') { A.cidade = e.target.value || undefined; if (A.cidade !== Q.NAO_ESTA) delete A.cid_txt; render(true); return; }
+    else if (f === 'estado_livre') A.estado_livre = e.target.value || undefined;
     else if (f === 'assunto') { A.assunto = e.target.value || undefined; render(true); return; }
     else if (f === 'consentimento') A.consentimento = e.target.checked;
     else return;

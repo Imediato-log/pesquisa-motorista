@@ -19,8 +19,6 @@ var QUESTOES = (function () {
 
   var OPERACOES = ['XD - Cross', 'FF - Full', 'Last'];
   var NOME_LIDER = { 'XD - Cross': 'XD', 'FF - Full': 'Full', 'Last': 'Last' };
-  var ESTADOS = ['Ceará', 'Distrito Federal', 'Espírito Santo', 'Goiás', 'Mato Grosso do Sul', 'Minas Gerais', 'Paraná',
-                 'Rio Grande do Sul', 'Rio de Janeiro', 'Santa Catarina', 'São Paulo'];
   var NOTA_ROTULOS = ['Muito ruim', 'Ruim', 'Regular', 'Bom', 'Ótimo'];
 
   /* Todos os estados, só para quem digita uma cidade que "Não está na lista". */
@@ -55,7 +53,7 @@ var QUESTOES = (function () {
     }
   };
   function ufsDa(A) { return Object.keys(CIDADES[A.operacao] || {}); }
-  function cidadesDa(A) { return ((CIDADES[A.operacao] || {})[A.cid_uf]) || []; }
+  function cidadesDa(A) { return ((CIDADES[A.operacao] || {})[A.estado]) || []; }
 
   var AREAS = [
     { id: 'escala', nome: 'Escala', apoio: 'quem monta suas rotas: horários, paradas, KM e quantidade de rotas' },
@@ -152,17 +150,13 @@ var QUESTOES = (function () {
       titulo: 'Olá! Sua opinião ajuda a melhorar o seu dia a dia na operação.',
       legenda: 'São perguntas rápidas, uma por tela. Suas respostas não mudam a sua avaliação como agregado.' },
     { id: 'ident', tipo: 'ident',
-      titulo: 'Em qual operação e estado você roda?',
+      titulo: 'Em qual operação você roda?',
       legenda: 'Se roda em mais de uma operação, escolha a que você mais faz.',
-      estado_rotulo: 'Em qual estado você roda?' },
-    { id: 'cid_uf', tipo: 'unica', campo: 'cid_uf',
-      titulo: function (A) { return A.operacao === 'Last' ? 'Em qual estado você faz a coleta?' : 'Em qual estado você descarrega?'; },
-      legenda: 'Só aparecem os estados da sua operação. Se o seu não estiver na lista, escolha a última opção.',
-      opcoes: function (A) { return ufsDa(A).concat([NAO_ESTA]); } },
-    { id: 'cidade', tipo: 'cidade',
-      titulo: function (A) { return A.operacao === 'Last' ? 'Em qual cidade você faz a coleta?' : 'Em qual cidade você descarrega?'; },
-      legenda: function (A) { return A.cid_uf === NAO_ESTA ? 'Escreva a cidade e escolha o estado.' : 'Estado: ' + A.cid_uf + '.'; },
-      cidade_rotulo: 'Cidade', estado_rotulo: 'Estado', estado_vazio: 'Escolha o estado' },
+      estado_rotulo: function (A) { return A.operacao === 'Last' ? 'Em qual estado você faz a coleta?' : 'Em qual estado você descarrega?'; },
+      estado_vazio: 'Escolha o estado',
+      cidade_rotulo: function (A) { return A.operacao === 'Last' ? 'Em qual cidade você faz a coleta?' : 'Em qual cidade você descarrega?'; },
+      cidade_vazio: 'Escolha a cidade',
+      cidade_digite: 'Escreva a cidade', estado_livre_rotulo: 'Estado dessa cidade' },
     { id: 'placa', tipo: 'placa',
       titulo: 'Qual a placa que você mais usa com a gente?',
       legenda: 'Só letras e números, sem traço. Ex.: ABC1D23' },
@@ -249,7 +243,7 @@ var QUESTOES = (function () {
   return {
     versao: VERSAO, NAO_ESTA: NAO_ESTA, SEM_PROBLEMA: SEM_PROBLEMA, PAG_ABERTO: PAG_ABERTO,
     cidades: CIDADES, estadosBR: ESTADOS_BR, ufsDa: ufsDa, cidadesDa: cidadesDa, cidadeMin: 2, cidadeMax: 60,
-    operacoes: OPERACOES, nomeLider: NOME_LIDER, estados: ESTADOS, notaRotulos: NOTA_ROTULOS,
+    operacoes: OPERACOES, nomeLider: NOME_LIDER, estados: ESTADOS_BR, notaRotulos: NOTA_ROTULOS,
     areas: AREAS, problemas: PROBLEMAS, espera: ESPERA, listas: LISTAS,
     intencaoRisco: INTENCAO_RISCO, intencaoFirme: INTENCAO_FIRME,
     notas: NOTAS, telas: TELAS,
